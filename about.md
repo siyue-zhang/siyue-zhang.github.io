@@ -24,7 +24,7 @@ CFA           |  PMP
 
 ## Publications
 
-**S. Zhang**, W. Y. B. Lim, W. C. Ng, Z. Xiong, D. Niyato, X. S. Shen, and C. Miao, "Towards Green Metaverse Networking: Technologies, Advancements and Future Directions," IEEE Network, accepted.
+**S. Zhang**, W. Y. B. Lim, W. C. Ng, Z. Xiong, D. Niyato, X. S. Shen, and C. Miao, "Towards Green Metaverse Networking: Technologies, Advancements and Future Directions", IEEE Network, doi: 10.1109/MNET.130.2200510.
 
 Zhang K, Troitzsch S, **Zhang S Y**, et al. Transactive Energy in an Urban Environment: A Case Study of Local Generation and Flexibility Potentials in a Singaporean Urban District[J]. Frontiers in Energy Research, 2021, 9: 632992.
 

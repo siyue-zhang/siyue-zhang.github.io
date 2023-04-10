@@ -7,7 +7,7 @@ tag: Project
 
 This is the assignment of NTU CE7412: Computational and Systems Biology by Professor Jagath Rajapakse. The full report is [here](http://siyue-zhang.github.io/images/A2_Report.html).
 
-This project aims to discover biomarkers and predict colorectal cancer (CRC) through studying the gene expressions of 59 CRC patients and 62 healthy controls (HCs) from Gene Expression Ominibus (GEO) database with id GSE164191. Two data objects are essential: a gene expression matrix (54,675 $\times$ 121) and a phenotype table (121 $\times$ 4). To achieve the goal, 4 types of analysis have been conducted as followings:
+This project aims to discover biomarkers and predict colorectal cancer (CRC) through studying the gene expressions of 59 CRC patients and 62 healthy controls (HCs) from Gene Expression Ominibus (GEO) database with id GSE164191. Two data objects are essential: a gene expression matrix (54,675, 121) and a phenotype table (121, 4). To achieve the goal, 4 types of analysis have been conducted as followings:
 
 # Differential Expression Analysis (DEGs)
 

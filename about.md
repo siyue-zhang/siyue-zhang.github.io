@@ -24,7 +24,9 @@ CFA           |  PMP
 
 ## Publications
 
-**S. Zhang**, W. Y. B. Lim, W. C. Ng, Z. Xiong, D. Niyato, X. S. Shen, and C. Miao, "Towards Green Metaverse Networking: Technologies, Advancements and Future Directions", IEEE Network, doi: 10.1109/MNET.130.2200510.
+**Zhang S**, Xu M, Lim W Y B, et al.. “Sustainable AIGC Workload Scheduling of Geo-Distributed Data Centers: A Multi-Agent Reinforcement Learning Approach”, IEEE Global Communications Conference (GLOBECOM), 2023, accepted.
+
+**Zhang S**, Lim W Y B, Ng W C, et al.. “Towards Green Metaverse Networking: Technologies, Advancements and Future Directions”, IEEE Network, 2023, doi: 10.1109/MNET.130.2200510. 
 
 Zhang K, Troitzsch S, **Zhang S Y**, et al. Transactive Energy in an Urban Environment: A Case Study of Local Generation and Flexibility Potentials in a Singaporean Urban District[J]. Frontiers in Energy Research, 2021, 9: 632992.
 

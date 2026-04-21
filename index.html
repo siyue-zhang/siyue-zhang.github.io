@@ -190,8 +190,8 @@
         ></script>
         <script>
             (function () {
-                var STORAGE_KEY = "visitor-map-stats-v3";
-                var LEGACY_STORAGE_KEYS = ["visitor-map-stats-v2", "visitor-map-stats-v1"];
+                var WORKER_API_BASE = "https://YOUR-WORKER.workers.dev";
+                var LOCAL_STORAGE_FALLBACK_KEY = "visitor-map-fallback-v1";
                 var LOCATION_APIS = [
                     "https://ipapi.co/json/",
                     "https://geolocation-db.com/json/",
@@ -209,24 +209,21 @@
 
                 var markerLayer = L.layerGroup().addTo(map);
 
-                function loadStats() {
+                function loadLocalFallbackStats() {
                     try {
-                        var raw = localStorage.getItem(STORAGE_KEY);
+                        var raw = localStorage.getItem(LOCAL_STORAGE_FALLBACK_KEY);
                         var parsed = raw ? JSON.parse(raw) : { countries: {} };
                         if (!parsed || !parsed.countries) {
                             parsed = { countries: {} };
                         }
-                        migrateLegacyStats(parsed);
                         return parsed;
                     } catch (err) {
-                        var fallback = { countries: {} };
-                        migrateLegacyStats(fallback);
-                        return fallback;
+                        return { countries: {} };
                     }
                 }
 
-                function saveStats(stats) {
-                    localStorage.setItem(STORAGE_KEY, JSON.stringify(stats));
+                function saveLocalFallbackStats(stats) {
+                    localStorage.setItem(LOCAL_STORAGE_FALLBACK_KEY, JSON.stringify(stats));
                 }
 
                 function addCountryCount(stats, country, lat, lng, count) {
@@ -250,58 +247,22 @@
                     }
                 }
 
-                function migrateLegacyStats(stats) {
-                    LEGACY_STORAGE_KEYS.forEach(function (legacyKey) {
-                        try {
-                            var legacyRaw = localStorage.getItem(legacyKey);
-                            if (!legacyRaw) {
-                                return;
-                            }
-
-                            var legacy = JSON.parse(legacyRaw);
-
-                            if (legacy && legacy.countries) {
-                                Object.keys(legacy.countries).forEach(function (k) {
-                                    var item = legacy.countries[k];
-                                    addCountryCount(
-                                        stats,
-                                        item.country,
-                                        Number(item.lat),
-                                        Number(item.lng),
-                                        Number(item.count) || 1
-                                    );
-                                });
-                            }
-
-                            if (legacy && legacy.locations) {
-                                Object.keys(legacy.locations).forEach(function (k) {
-                                    var item = legacy.locations[k];
-                                    addCountryCount(
-                                        stats,
-                                        item.country || "Unknown Country",
-                                        Number(item.lat),
-                                        Number(item.lng),
-                                        Number(item.count) || 1
-                                    );
-                                });
-                            }
-
-                            localStorage.removeItem(legacyKey);
-                        } catch (e) {
-                            // Ignore malformed legacy data.
-                        }
-                    });
-
-                    saveStats(stats);
+                function getWorkerUrl(path) {
+                    var base = (WORKER_API_BASE || "").replace(/\/$/, "");
+                    return base + path;
                 }
 
-                function fetchWithTimeout(url, timeoutMs) {
+                function isWorkerConfigured() {
+                    return WORKER_API_BASE && WORKER_API_BASE.indexOf("YOUR-WORKER") === -1;
+                }
+
+                function fetchWithTimeout(url, timeoutMs, options) {
                     return new Promise(function (resolve, reject) {
                         var timeoutId = setTimeout(function () {
                             reject(new Error("timeout"));
                         }, timeoutMs);
 
-                        fetch(url)
+                        fetch(url, options || {})
                             .then(function (resp) {
                                 if (!resp.ok) {
                                     throw new Error("bad response");
@@ -366,6 +327,28 @@
                     return tryNext();
                 }
 
+                function fetchGlobalStats() {
+                    if (!isWorkerConfigured()) {
+                        return Promise.reject(new Error("worker not configured"));
+                    }
+
+                    return fetchWithTimeout(getWorkerUrl("/stats"), 5000);
+                }
+
+                function sendGlobalVisit(location) {
+                    if (!isWorkerConfigured()) {
+                        return Promise.reject(new Error("worker not configured"));
+                    }
+
+                    return fetchWithTimeout(getWorkerUrl("/visit"), 5000, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify(location)
+                    });
+                }
+
                 function render(stats) {
                     var rows = [];
 
@@ -410,24 +393,47 @@
                     }
                 }
 
+                function renderFallback() {
+                    render(loadLocalFallbackStats());
+                }
+
                 function recordCurrentVisit() {
-                    var stats = loadStats();
+                    var fallbackStats = loadLocalFallbackStats();
 
                     fetchLocationData()
                         .then(function (location) {
-                            addCountryCount(stats, location.country, location.lat, location.lng, 1);
-
-                            saveStats(stats);
-                            render(stats);
+                            return sendGlobalVisit(location)
+                                .then(function (remoteStats) {
+                                    render(remoteStats);
+                                })
+                                .catch(function () {
+                                    addCountryCount(fallbackStats, location.country, location.lat, location.lng, 1);
+                                    saveLocalFallbackStats(fallbackStats);
+                                    render(fallbackStats);
+                                });
                         })
                         .catch(function () {
-                            // If geolocation fails, render existing local stats only.
-                            render(stats);
+                            // If geolocation fails, render existing stats.
+                            if (isWorkerConfigured()) {
+                                fetchGlobalStats().then(render).catch(renderFallback);
+                            } else {
+                                renderFallback();
+                            }
                         });
                 }
 
-                render(loadStats());
-                recordCurrentVisit();
+                function bootstrap() {
+                    if (isWorkerConfigured()) {
+                        fetchGlobalStats().then(render).catch(renderFallback);
+                    } else {
+                        renderFallback();
+                        console.warn("Visitor map is in local fallback mode. Set WORKER_API_BASE to enable global counts.");
+                    }
+
+                    recordCurrentVisit();
+                }
+
+                bootstrap();
             })();
         </script>
     </body>

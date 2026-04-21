@@ -187,7 +187,7 @@
                 <div class="col-md-12">
                     <h2>Visitor Map</h2>
                     <p style="color: #666; margin-bottom: 8px;">
-                        Historical visit records are stored locally and shown as cumulative location statistics.
+                        Historical visits are aggregated by country and shown as cumulative totals.
                     </p>
                     <div class="visit-stats-summary" id="visit-summary"></div>
                     <div id="visit-map" aria-label="Visitor location map"></div>
@@ -195,29 +195,13 @@
                     <table class="table table-striped table-condensed visit-table" id="visit-table">
                         <thead>
                             <tr>
-                                <th>Location</th>
-                                <th>Visits</th>
-                                <th>Last Visit</th>
+                                <th>Country</th>
+                                <th>Total Visits</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr>
-                                <td colspan="3">Loading visit statistics...</td>
-                            </tr>
-                        </tbody>
-                    </table>
-
-                    <h4 style="margin-top: 18px;">Recent Visit History</h4>
-                    <table class="table table-bordered table-condensed visit-history-table" id="visit-history-table">
-                        <thead>
-                            <tr>
-                                <th>Time</th>
-                                <th>Location</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td colspan="2">Loading historical visits...</td>
+                                <td colspan="2">Loading visit statistics...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -238,9 +222,8 @@
         ></script>
         <script>
             (function () {
-                var STORAGE_KEY = "visitor-map-stats-v2";
+                var STORAGE_KEY = "visitor-map-stats-v3";
                 var API_URL = "https://ipapi.co/json/";
-                var MAX_HISTORY = 200;
 
                 var map = L.map("visit-map", {
                     zoomControl: true
@@ -257,18 +240,15 @@
                     try {
                         var raw = localStorage.getItem(STORAGE_KEY);
                         if (!raw) {
-                            return { locations: {}, history: [] };
+                            return { countries: {} };
                         }
                         var parsed = JSON.parse(raw);
-                        if (!parsed.locations || !Array.isArray(parsed.history)) {
-                            return {
-                                locations: parsed.locations || {},
-                                history: Array.isArray(parsed.history) ? parsed.history : []
-                            };
+                        if (!parsed.countries) {
+                            return { countries: {} };
                         }
                         return parsed;
                     } catch (err) {
-                        return { locations: {}, history: [] };
+                        return { countries: {} };
                     }
                 }
 
@@ -287,11 +267,10 @@
                 function render(stats) {
                     var rows = [];
                     var totalVisits = 0;
-                    var historyRows = (stats.history || []).slice();
 
-                    Object.keys(stats.locations).forEach(function (key) {
-                        rows.push(stats.locations[key]);
-                        totalVisits += stats.locations[key].count;
+                    Object.keys(stats.countries).forEach(function (key) {
+                        rows.push(stats.countries[key]);
+                        totalVisits += stats.countries[key].count;
                     });
 
                     rows.sort(function (a, b) {
@@ -301,30 +280,16 @@
                     var summaryEl = document.getElementById("visit-summary");
                     summaryEl.innerHTML =
                         "<strong>Total visits:</strong> " + totalVisits +
-                        " &nbsp; | &nbsp; <strong>Unique locations:</strong> " + rows.length +
-                        " &nbsp; | &nbsp; <strong>History records:</strong> " + historyRows.length;
+                        " &nbsp; | &nbsp; <strong>Countries:</strong> " + rows.length;
 
                     var tbody = document.querySelector("#visit-table tbody");
                     if (!rows.length) {
-                        tbody.innerHTML = "<tr><td colspan='3'>No visit data yet.</td></tr>";
+                        tbody.innerHTML = "<tr><td colspan='2'>No visit data yet.</td></tr>";
                     } else {
                         tbody.innerHTML = rows.map(function (row) {
                             return "<tr>" +
-                                "<td>" + row.city + ", " + row.country + "</td>" +
+                                "<td>" + row.country + "</td>" +
                                 "<td>" + row.count + "</td>" +
-                                "<td>" + formatDate(row.lastVisit) + "</td>" +
-                                "</tr>";
-                        }).join("");
-                    }
-
-                    var historyBody = document.querySelector("#visit-history-table tbody");
-                    if (!historyRows.length) {
-                        historyBody.innerHTML = "<tr><td colspan='2'>No historical visits yet.</td></tr>";
-                    } else {
-                        historyBody.innerHTML = historyRows.slice(0, 30).map(function (row) {
-                            return "<tr>" +
-                                "<td>" + formatDate(row.time) + "</td>" +
-                                "<td>" + row.city + ", " + row.country + "</td>" +
                                 "</tr>";
                         }).join("");
                     }
@@ -347,9 +312,8 @@
                         });
 
                         marker.bindPopup(
-                            "<strong>" + row.city + ", " + row.country + "</strong><br>" +
-                            "Visits: " + row.count + "<br>" +
-                            "Last: " + formatDate(row.lastVisit)
+                            "<strong>" + row.country + "</strong><br>" +
+                            "Total visits: " + row.count
                         );
 
                         marker.addTo(markerLayer);
@@ -374,39 +338,25 @@
                             return resp.json();
                         })
                         .then(function (data) {
-                            var city = data.city || "Unknown City";
                             var country = data.country_name || data.country || "Unknown Country";
                             var lat = Number(data.latitude);
                             var lng = Number(data.longitude);
-                            var key = city + ", " + country;
+                            var key = country;
 
-                            if (!stats.locations[key]) {
-                                stats.locations[key] = {
-                                    city: city,
+                            if (!stats.countries[key]) {
+                                stats.countries[key] = {
                                     country: country,
                                     lat: isNaN(lat) ? 0 : lat,
                                     lng: isNaN(lng) ? 0 : lng,
-                                    count: 0,
-                                    firstVisit: null,
-                                    lastVisit: null
+                                    count: 0
                                 };
+                            } else if (!isNaN(lat) && !isNaN(lng)) {
+                                // Smooth country marker position if multiple cities are observed.
+                                stats.countries[key].lat = (stats.countries[key].lat + lat) / 2;
+                                stats.countries[key].lng = (stats.countries[key].lng + lng) / 2;
                             }
 
-                            var nowIso = new Date().toISOString();
-                            stats.locations[key].count += 1;
-                            stats.locations[key].lastVisit = nowIso;
-                            if (!stats.locations[key].firstVisit) {
-                                stats.locations[key].firstVisit = nowIso;
-                            }
-
-                            stats.history.unshift({
-                                time: nowIso,
-                                city: city,
-                                country: country
-                            });
-                            if (stats.history.length > MAX_HISTORY) {
-                                stats.history = stats.history.slice(0, MAX_HISTORY);
-                            }
+                            stats.countries[key].count += 1;
 
                             saveStats(stats);
                             render(stats);

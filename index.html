@@ -8,12 +8,6 @@
 
         <!-- Bootstrap Core CSS -->
         <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">
-        <link
-            rel="stylesheet"
-            href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-            integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-            crossorigin=""
-        >
 
         <style> 
             .container-fluid {
@@ -21,12 +15,6 @@
                 margin-right: auto;
                 max-width: 64em;
                 margin-top: 20px;
-            }
-
-            #visit-map {
-                height: 360px;
-                border-radius: 8px;
-                border: 1px solid #e3e3e3;
             }
         </style>
     </head>
@@ -46,16 +34,14 @@
                     College of Computing and Data Science,<br>
                     Nanyang Technological University<br>
                     Alibaba-NTU Singapore Joint Research Institute
-                    <p>
-
-                    <p>
+                    <p></p>
                     Email: siyue001@e.ntu.edu.sg<br>
                 </div>
             </div>
             <div class="row" style="margin-top: 10px">
                 <div class="col-md-12">
                 I am a fourth-year PhD student with <a href="https://ntu-nail.github.io/">NTU AI Language Lab</a> at Nanyang Technological University (NTU), supervised by <a href="https://tuanluu.github.io/">Prof. Anh Tuan Luu</a>. I am also visiting <a href="https://henryzhao5852.github.io/">Prof. Chen Zhao</a>'s lab at New York University (NYU) Shanghai. Before joining NTU, I obtained my Master's degree in Electrical Engineering from École Polytechnique and Bachelor's degree from Zhejiang University. My research broadly explores natural language processing, with interests in areas such as agentic search, information retrieval, and retrieval-augmented generation. 
-                <div class="col-md-12">
+                </div>
             </div>
 
 
@@ -172,269 +158,9 @@
 
             <div class="row" style="margin-top: 20px; margin-bottom: 30px;">
                 <div class="col-md-12">
-                    <div id="visit-map" aria-label="Visitor location map"></div>
+                    <a href="https://info.flagcounter.com/EZnD"><img src="https://s01.flagcounter.com/count2/EZnD/bg_FFFFFF/txt_000000/border_CCCCCC/columns_2/maxflags_10/viewers_0/labels_0/pageviews_0/flags_0/percent_0/" alt="Flag Counter" border="0"></a>
                 </div>
             </div>
 
-        <!-- jQuery -->
-
-        <!-- jQuery -->
-        <script src="https://code.jquery.com/jquery-1.9.1.min.js"></script>
-
-        <!-- Bootstrap Core JavaScript -->
-        <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
-        <script
-            src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-            crossorigin=""
-        ></script>
-        <script>
-            (function () {
-                var WORKER_API_BASE = "https://YOUR-WORKER.workers.dev";
-                var LOCAL_STORAGE_FALLBACK_KEY = "visitor-map-fallback-v1";
-                var LOCATION_APIS = [
-                    "https://ipapi.co/json/",
-                    "https://geolocation-db.com/json/",
-                    "https://ipwho.is/"
-                ];
-
-                var map = L.map("visit-map", {
-                    zoomControl: true
-                }).setView([20, 0], 2);
-
-                L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-                    maxZoom: 18,
-                    attribution: "&copy; OpenStreetMap contributors"
-                }).addTo(map);
-
-                var markerLayer = L.layerGroup().addTo(map);
-
-                function loadLocalFallbackStats() {
-                    try {
-                        var raw = localStorage.getItem(LOCAL_STORAGE_FALLBACK_KEY);
-                        var parsed = raw ? JSON.parse(raw) : { countries: {} };
-                        if (!parsed || !parsed.countries) {
-                            parsed = { countries: {} };
-                        }
-                        return parsed;
-                    } catch (err) {
-                        return { countries: {} };
-                    }
-                }
-
-                function saveLocalFallbackStats(stats) {
-                    localStorage.setItem(LOCAL_STORAGE_FALLBACK_KEY, JSON.stringify(stats));
-                }
-
-                function addCountryCount(stats, country, lat, lng, count) {
-                    var key = country || "Unknown Country";
-                    var numericCount = Math.max(1, Number(count) || 1);
-
-                    if (!stats.countries[key]) {
-                        stats.countries[key] = {
-                            country: key,
-                            lat: isNaN(lat) ? 20 : lat,
-                            lng: isNaN(lng) ? 0 : lng,
-                            count: 0
-                        };
-                    }
-
-                    stats.countries[key].count += numericCount;
-
-                    if (!isNaN(lat) && !isNaN(lng)) {
-                        stats.countries[key].lat = (stats.countries[key].lat + lat) / 2;
-                        stats.countries[key].lng = (stats.countries[key].lng + lng) / 2;
-                    }
-                }
-
-                function getWorkerUrl(path) {
-                    var base = (WORKER_API_BASE || "").replace(/\/$/, "");
-                    return base + path;
-                }
-
-                function isWorkerConfigured() {
-                    return WORKER_API_BASE && WORKER_API_BASE.indexOf("YOUR-WORKER") === -1;
-                }
-
-                function fetchWithTimeout(url, timeoutMs, options) {
-                    return new Promise(function (resolve, reject) {
-                        var timeoutId = setTimeout(function () {
-                            reject(new Error("timeout"));
-                        }, timeoutMs);
-
-                        fetch(url, options || {})
-                            .then(function (resp) {
-                                if (!resp.ok) {
-                                    throw new Error("bad response");
-                                }
-                                return resp.json();
-                            })
-                            .then(function (data) {
-                                clearTimeout(timeoutId);
-                                resolve(data);
-                            })
-                            .catch(function (err) {
-                                clearTimeout(timeoutId);
-                                reject(err);
-                            });
-                    });
-                }
-
-                function normalizeLocationData(data) {
-                    if (!data || data.success === false) {
-                        return null;
-                    }
-
-                    var country = data.country_name || data.country || data.countryName;
-                    var lat = Number(data.latitude || data.lat);
-                    var lng = Number(data.longitude || data.lon || data.lng || data.long);
-
-                    if (!country || isNaN(lat) || isNaN(lng)) {
-                        return null;
-                    }
-
-                    return {
-                        country: country,
-                        lat: lat,
-                        lng: lng
-                    };
-                }
-
-                function fetchLocationData() {
-                    var apiIndex = 0;
-
-                    function tryNext() {
-                        if (apiIndex >= LOCATION_APIS.length) {
-                            return Promise.reject(new Error("all geolocation providers failed"));
-                        }
-
-                        var url = LOCATION_APIS[apiIndex];
-                        apiIndex += 1;
-
-                        return fetchWithTimeout(url, 5000)
-                            .then(function (data) {
-                                var normalized = normalizeLocationData(data);
-                                if (!normalized) {
-                                    throw new Error("invalid location payload");
-                                }
-                                return normalized;
-                            })
-                            .catch(function () {
-                                return tryNext();
-                            });
-                    }
-
-                    return tryNext();
-                }
-
-                function fetchGlobalStats() {
-                    if (!isWorkerConfigured()) {
-                        return Promise.reject(new Error("worker not configured"));
-                    }
-
-                    return fetchWithTimeout(getWorkerUrl("/stats"), 5000);
-                }
-
-                function sendGlobalVisit(location) {
-                    if (!isWorkerConfigured()) {
-                        return Promise.reject(new Error("worker not configured"));
-                    }
-
-                    return fetchWithTimeout(getWorkerUrl("/visit"), 5000, {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/json"
-                        },
-                        body: JSON.stringify(location)
-                    });
-                }
-
-                function render(stats) {
-                    var rows = [];
-
-                    Object.keys(stats.countries).forEach(function (key) {
-                        rows.push(stats.countries[key]);
-                    });
-
-                    rows.sort(function (a, b) {
-                        return b.count - a.count;
-                    });
-
-                    markerLayer.clearLayers();
-                    var bounds = [];
-
-                    rows.forEach(function (row) {
-                        if (typeof row.lat !== "number" || typeof row.lng !== "number") {
-                            return;
-                        }
-
-                        var radius = 5 + Math.min(14, Math.log(row.count + 1) * 4);
-                        var marker = L.circleMarker([row.lat, row.lng], {
-                            radius: radius,
-                            color: "#0074D9",
-                            fillColor: "#39CCCC",
-                            fillOpacity: 0.7,
-                            weight: 1
-                        });
-
-                        marker.bindPopup(
-                            "<strong>" + row.country + "</strong><br>" +
-                            "Total visits: " + row.count
-                        );
-
-                        marker.addTo(markerLayer);
-                        bounds.push([row.lat, row.lng]);
-                    });
-
-                    if (bounds.length > 1) {
-                        map.fitBounds(bounds, { padding: [20, 20] });
-                    } else if (bounds.length === 1) {
-                        map.setView(bounds[0], 4);
-                    }
-                }
-
-                function renderFallback() {
-                    render(loadLocalFallbackStats());
-                }
-
-                function recordCurrentVisit() {
-                    var fallbackStats = loadLocalFallbackStats();
-
-                    fetchLocationData()
-                        .then(function (location) {
-                            return sendGlobalVisit(location)
-                                .then(function (remoteStats) {
-                                    render(remoteStats);
-                                })
-                                .catch(function () {
-                                    addCountryCount(fallbackStats, location.country, location.lat, location.lng, 1);
-                                    saveLocalFallbackStats(fallbackStats);
-                                    render(fallbackStats);
-                                });
-                        })
-                        .catch(function () {
-                            // If geolocation fails, render existing stats.
-                            if (isWorkerConfigured()) {
-                                fetchGlobalStats().then(render).catch(renderFallback);
-                            } else {
-                                renderFallback();
-                            }
-                        });
-                }
-
-                function bootstrap() {
-                    if (isWorkerConfigured()) {
-                        fetchGlobalStats().then(render).catch(renderFallback);
-                    } else {
-                        renderFallback();
-                        console.warn("Visitor map is in local fallback mode. Set WORKER_API_BASE to enable global counts.");
-                    }
-
-                    recordCurrentVisit();
-                }
-
-                bootstrap();
-            })();
-        </script>
     </body>
 </html>

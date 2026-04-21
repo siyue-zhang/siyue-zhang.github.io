@@ -191,7 +191,12 @@
         <script>
             (function () {
                 var STORAGE_KEY = "visitor-map-stats-v3";
-                var API_URL = "https://ipapi.co/json/";
+                var LEGACY_STORAGE_KEYS = ["visitor-map-stats-v2", "visitor-map-stats-v1"];
+                var LOCATION_APIS = [
+                    "https://ipapi.co/json/",
+                    "https://geolocation-db.com/json/",
+                    "https://ipwho.is/"
+                ];
 
                 var map = L.map("visit-map", {
                     zoomControl: true
@@ -207,16 +212,16 @@
                 function loadStats() {
                     try {
                         var raw = localStorage.getItem(STORAGE_KEY);
-                        if (!raw) {
-                            return { countries: {} };
+                        var parsed = raw ? JSON.parse(raw) : { countries: {} };
+                        if (!parsed || !parsed.countries) {
+                            parsed = { countries: {} };
                         }
-                        var parsed = JSON.parse(raw);
-                        if (!parsed.countries) {
-                            return { countries: {} };
-                        }
+                        migrateLegacyStats(parsed);
                         return parsed;
                     } catch (err) {
-                        return { countries: {} };
+                        var fallback = { countries: {} };
+                        migrateLegacyStats(fallback);
+                        return fallback;
                     }
                 }
 
@@ -224,12 +229,141 @@
                     localStorage.setItem(STORAGE_KEY, JSON.stringify(stats));
                 }
 
-                function formatDate(isoDate) {
-                    if (!isoDate) {
-                        return "-";
+                function addCountryCount(stats, country, lat, lng, count) {
+                    var key = country || "Unknown Country";
+                    var numericCount = Math.max(1, Number(count) || 1);
+
+                    if (!stats.countries[key]) {
+                        stats.countries[key] = {
+                            country: key,
+                            lat: isNaN(lat) ? 20 : lat,
+                            lng: isNaN(lng) ? 0 : lng,
+                            count: 0
+                        };
                     }
-                    var d = new Date(isoDate);
-                    return d.toLocaleString();
+
+                    stats.countries[key].count += numericCount;
+
+                    if (!isNaN(lat) && !isNaN(lng)) {
+                        stats.countries[key].lat = (stats.countries[key].lat + lat) / 2;
+                        stats.countries[key].lng = (stats.countries[key].lng + lng) / 2;
+                    }
+                }
+
+                function migrateLegacyStats(stats) {
+                    LEGACY_STORAGE_KEYS.forEach(function (legacyKey) {
+                        try {
+                            var legacyRaw = localStorage.getItem(legacyKey);
+                            if (!legacyRaw) {
+                                return;
+                            }
+
+                            var legacy = JSON.parse(legacyRaw);
+
+                            if (legacy && legacy.countries) {
+                                Object.keys(legacy.countries).forEach(function (k) {
+                                    var item = legacy.countries[k];
+                                    addCountryCount(
+                                        stats,
+                                        item.country,
+                                        Number(item.lat),
+                                        Number(item.lng),
+                                        Number(item.count) || 1
+                                    );
+                                });
+                            }
+
+                            if (legacy && legacy.locations) {
+                                Object.keys(legacy.locations).forEach(function (k) {
+                                    var item = legacy.locations[k];
+                                    addCountryCount(
+                                        stats,
+                                        item.country || "Unknown Country",
+                                        Number(item.lat),
+                                        Number(item.lng),
+                                        Number(item.count) || 1
+                                    );
+                                });
+                            }
+
+                            localStorage.removeItem(legacyKey);
+                        } catch (e) {
+                            // Ignore malformed legacy data.
+                        }
+                    });
+
+                    saveStats(stats);
+                }
+
+                function fetchWithTimeout(url, timeoutMs) {
+                    return new Promise(function (resolve, reject) {
+                        var timeoutId = setTimeout(function () {
+                            reject(new Error("timeout"));
+                        }, timeoutMs);
+
+                        fetch(url)
+                            .then(function (resp) {
+                                if (!resp.ok) {
+                                    throw new Error("bad response");
+                                }
+                                return resp.json();
+                            })
+                            .then(function (data) {
+                                clearTimeout(timeoutId);
+                                resolve(data);
+                            })
+                            .catch(function (err) {
+                                clearTimeout(timeoutId);
+                                reject(err);
+                            });
+                    });
+                }
+
+                function normalizeLocationData(data) {
+                    if (!data || data.success === false) {
+                        return null;
+                    }
+
+                    var country = data.country_name || data.country || data.countryName;
+                    var lat = Number(data.latitude || data.lat);
+                    var lng = Number(data.longitude || data.lon || data.lng || data.long);
+
+                    if (!country || isNaN(lat) || isNaN(lng)) {
+                        return null;
+                    }
+
+                    return {
+                        country: country,
+                        lat: lat,
+                        lng: lng
+                    };
+                }
+
+                function fetchLocationData() {
+                    var apiIndex = 0;
+
+                    function tryNext() {
+                        if (apiIndex >= LOCATION_APIS.length) {
+                            return Promise.reject(new Error("all geolocation providers failed"));
+                        }
+
+                        var url = LOCATION_APIS[apiIndex];
+                        apiIndex += 1;
+
+                        return fetchWithTimeout(url, 5000)
+                            .then(function (data) {
+                                var normalized = normalizeLocationData(data);
+                                if (!normalized) {
+                                    throw new Error("invalid location payload");
+                                }
+                                return normalized;
+                            })
+                            .catch(function () {
+                                return tryNext();
+                            });
+                    }
+
+                    return tryNext();
                 }
 
                 function render(stats) {
@@ -279,33 +413,9 @@
                 function recordCurrentVisit() {
                     var stats = loadStats();
 
-                    fetch(API_URL)
-                        .then(function (resp) {
-                            if (!resp.ok) {
-                                throw new Error("Failed to fetch location");
-                            }
-                            return resp.json();
-                        })
-                        .then(function (data) {
-                            var country = data.country_name || data.country || "Unknown Country";
-                            var lat = Number(data.latitude);
-                            var lng = Number(data.longitude);
-                            var key = country;
-
-                            if (!stats.countries[key]) {
-                                stats.countries[key] = {
-                                    country: country,
-                                    lat: isNaN(lat) ? 0 : lat,
-                                    lng: isNaN(lng) ? 0 : lng,
-                                    count: 0
-                                };
-                            } else if (!isNaN(lat) && !isNaN(lng)) {
-                                // Smooth country marker position if multiple cities are observed.
-                                stats.countries[key].lat = (stats.countries[key].lat + lat) / 2;
-                                stats.countries[key].lng = (stats.countries[key].lng + lng) / 2;
-                            }
-
-                            stats.countries[key].count += 1;
+                    fetchLocationData()
+                        .then(function (location) {
+                            addCountryCount(stats, location.country, location.lat, location.lng, 1);
 
                             saveStats(stats);
                             render(stats);

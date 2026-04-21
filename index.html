@@ -28,19 +28,6 @@
                 border-radius: 8px;
                 border: 1px solid #e3e3e3;
             }
-
-            .visit-stats-summary {
-                margin: 12px 0;
-                font-size: 14px;
-            }
-
-            .visit-table {
-                margin-top: 12px;
-            }
-
-            .visit-history-table {
-                margin-top: 12px;
-            }
         </style>
     </head>
     <body>
@@ -185,26 +172,7 @@
 
             <div class="row" style="margin-top: 20px; margin-bottom: 30px;">
                 <div class="col-md-12">
-                    <h2>Visitor Map</h2>
-                    <p style="color: #666; margin-bottom: 8px;">
-                        Historical visits are aggregated by country and shown as cumulative totals.
-                    </p>
-                    <div class="visit-stats-summary" id="visit-summary"></div>
                     <div id="visit-map" aria-label="Visitor location map"></div>
-
-                    <table class="table table-striped table-condensed visit-table" id="visit-table">
-                        <thead>
-                            <tr>
-                                <th>Country</th>
-                                <th>Total Visits</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td colspan="2">Loading visit statistics...</td>
-                            </tr>
-                        </tbody>
-                    </table>
                 </div>
             </div>
 
@@ -266,33 +234,14 @@
 
                 function render(stats) {
                     var rows = [];
-                    var totalVisits = 0;
 
                     Object.keys(stats.countries).forEach(function (key) {
                         rows.push(stats.countries[key]);
-                        totalVisits += stats.countries[key].count;
                     });
 
                     rows.sort(function (a, b) {
                         return b.count - a.count;
                     });
-
-                    var summaryEl = document.getElementById("visit-summary");
-                    summaryEl.innerHTML =
-                        "<strong>Total visits:</strong> " + totalVisits +
-                        " &nbsp; | &nbsp; <strong>Countries:</strong> " + rows.length;
-
-                    var tbody = document.querySelector("#visit-table tbody");
-                    if (!rows.length) {
-                        tbody.innerHTML = "<tr><td colspan='2'>No visit data yet.</td></tr>";
-                    } else {
-                        tbody.innerHTML = rows.map(function (row) {
-                            return "<tr>" +
-                                "<td>" + row.country + "</td>" +
-                                "<td>" + row.count + "</td>" +
-                                "</tr>";
-                        }).join("");
-                    }
 
                     markerLayer.clearLayers();
                     var bounds = [];
